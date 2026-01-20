@@ -1,0 +1,37 @@
+[package]
+name = "teremock"
+version = "0.5.0"
+edition = "2021"
+authors = ["Stepan Romankov"]
+description = "Fast integration testing library for teloxide Telegram bots"
+
+license = "MIT"
+readme = "../README.md"
+repository = "https://github.com/zerosixty/teremock"
+
+keywords = ["teloxide", "telegram", "test", "testing", "mock"]
+categories = ["development-tools::testing"]
+
+[dependencies]
+log = "0.4"
+pretty_env_logger = "0.5"
+url = "2"
+teloxide = { version = "0.17", default-features = false }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+teremock_macros = { version = "0.5.0", path = "../teremock_macros" }
+mime = "0.3"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
+mime_guess = "2"
+rand = { version = "0.9", default-features = false, features = ["std", "std_rng"] }
+actix-multipart = "0.7"
+futures-util = { version = "0.3", default-features = false, features = ["std"] }
+actix-web = "4"
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+
+[dev-dependencies]
+teloxide = { version = "0.17", features = ["macros"] }
+
+[lib]
+name = "teremock"

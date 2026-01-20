@@ -1,0 +1,16 @@
+[package]
+name = "teremock_macros"
+version = "0.5.0"
+edition = "2021"
+authors = ["Stepan Romankov"]
+description = "Proc macros for teremock"
+license = "MIT"
+repository = "https://github.com/zerosixty/teremock"
+
+[dependencies]
+syn = "2"
+quote = "1"
+proc-macro2 = "1"
+
+[lib]
+proc-macro = true

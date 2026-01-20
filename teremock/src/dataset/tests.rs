@@ -1,0 +1,543 @@
+use teloxide::{
+    dispatching::dialogue::GetChatId,
+    types::{ChatId, MessageEntity, MessageId, UpdateId, UpdateKind, UserId},
+};
+use update::MockUpdatePoll;
+
+use crate::{dataset::*, proc_macros::Changeable};
+
+#[derive(Changeable)]
+struct Test {
+    pub field1: String,
+    pub field2: ChatId,
+    pub field3: Option<String>,
+    pub field4: Option<i32>,
+}
+
+#[test]
+fn test_changeable() {
+    let test = Test {
+        field1: "123".to_string(),
+        field2: ChatId(456),
+        field3: None,
+        field4: None,
+    };
+    let test = test.field1("789").field2(1234).field3("456").field4(123);
+
+    assert_eq!(test.field1, "789");
+    assert_eq!(test.field2, ChatId(1234));
+    assert_eq!(test.field3, Some("456".to_string()));
+    assert_eq!(test.field4, Some(123));
+}
+
+//
+//
+//
+
+#[test]
+fn test_user() {
+    let user = MockUser::new()
+        .first_name("Test")
+        .last_name("User")
+        .id(1234)
+        .username("test_user");
+
+    let user_object = user.build();
+    assert_eq!(user_object.first_name, "Test");
+    assert_eq!(user_object.last_name, Some("User".to_string()));
+    assert_eq!(user_object.id, UserId(1234));
+    assert_eq!(user_object.username, Some("test_user".to_string()));
+}
+
+#[test]
+fn test_location() {
+    let location = MockLocation::new().latitude(0.0).longitude(1.0);
+    let location_object = location.build();
+    assert_eq!(location_object.latitude, 0.0);
+    assert_eq!(location_object.longitude, 1.0);
+}
+
+//
+//
+//
+
+#[test]
+fn test_public_group_chat() {
+    let chat = MockGroupChat::new().title("Test").id(-1234);
+    let chat_photo = MockChatPhoto::new().build();
+    let chat_full_info = MockChatFullInfoGroup::new()
+        .title("Test2")
+        .id(-1234)
+        .photo(chat_photo.clone());
+
+    let chat_object = chat.build();
+    assert_eq!(chat_object.title(), Some("Test"));
+    assert_eq!(chat_object.id, ChatId(-1234));
+
+    let chat_full_info_object = chat_full_info.build();
+    assert_eq!(chat_full_info_object.title(), Some("Test2"));
+    assert_eq!(chat_full_info_object.id, ChatId(-1234));
+    assert_eq!(chat_full_info_object.photo, Some(chat_photo));
+}
+
+#[test]
+fn test_supergroup_chat() {
+    let chat = MockSupergroupChat::new().id(-1234);
+    let chat_full_info = MockChatFullInfoSupergroup::new()
+        .join_by_request(true)
+        .id(-1234);
+
+    let chat_object = chat.build();
+    assert_eq!(chat_object.id, ChatId(-1234));
+
+    let chat_full_info_object = chat_full_info.build();
+    assert_eq!(chat_full_info_object.id, ChatId(-1234));
+    assert!(chat_full_info_object.join_by_request());
+}
+
+#[test]
+fn test_channel_chat() {
+    let chat = MockChannelChat::new().username("test_channel").id(-1234);
+    let chat_full_info = MockChatFullInfoChannel::new()
+        .username("test_channel")
+        .linked_chat_id(-12345)
+        .id(-1234);
+
+    let chat_object = chat.build();
+    assert_eq!(chat_object.id, ChatId(-1234));
+    assert_eq!(chat_object.username(), Some("test_channel"));
+
+    let chat_full_info_object = chat_full_info.build();
+    assert_eq!(chat_full_info_object.id, ChatId(-1234));
+    assert_eq!(chat_full_info_object.username(), Some("test_channel"));
+    assert_eq!(chat_full_info_object.linked_chat_id(), Some(-12345));
+}
+
+#[test]
+fn test_private_group_chat() {
+    let chat = MockPrivateChat::new().first_name("Test").id(1234);
+
+    let chat_full_info = MockChatFullInfoPrivate::new()
+        .first_name("Test")
+        .id(1234)
+        .bio("Test bio");
+
+    let chat_object = chat.build();
+    assert_eq!(chat_object.first_name(), Some("Test"));
+    assert_eq!(chat_object.id, ChatId(1234));
+
+    let chat_full_info_object = chat_full_info.build();
+    assert_eq!(chat_full_info_object.first_name(), Some("Test"));
+    assert_eq!(chat_full_info_object.id, ChatId(1234));
+    assert_eq!(chat_full_info_object.bio(), Some("Test bio"));
+}
+
+//
+//
+//
+
+#[test]
+fn test_message_common_text() {
+    let simple_message = MockMessageText::new().text("simple");
+    let simple_message_object = simple_message.build(); // This is now teloxide::types::Message
+
+    assert_eq!(simple_message_object.text(), Some("simple"));
+    assert_eq!(
+        simple_message_object.from.unwrap().first_name,
+        MockUser::FIRST_NAME
+    );
+    assert_eq!(simple_message_object.chat.id, ChatId(MockUser::ID as i64)); // Some sane default values
+                                                                            // User id because it is a private chat
+
+    let message = MockMessageText::new()
+        .text("text")
+        .id(123) // If you want - you can change everything by just calling it as a method
+        .from(MockUser::new().first_name("Test").build()) // Sub categories need to be built in separately
+        .chat(MockGroupChat::new().id(-123).build())
+        .is_automatic_forward(true)
+        .entities(vec![MessageEntity::bold(0, 3)]);
+
+    let message_object = message.build();
+
+    assert_eq!(message_object.text(), Some("text"));
+    assert_eq!(message_object.id, MessageId(123));
+    assert_eq!(message_object.from.clone().unwrap().first_name, "Test");
+    assert_eq!(message_object.chat.id, ChatId(-123));
+    assert!(message_object.is_automatic_forward());
+    assert_eq!(
+        message_object.entities(),
+        Some(vec![MessageEntity::bold(0, 3)]).as_deref()
+    );
+}
+
+#[test]
+fn test_into_update() {
+    let message = MockMessageText::new().text("text");
+
+    let update = message.into_update(&AtomicI32::new(42))[0].clone();
+
+    assert_eq!(update.id, UpdateId(42));
+    assert_eq!(update.chat_id(), Some(ChatId(MockUser::ID as i64)));
+}
+
+#[test]
+fn test_message_common_animation() {
+    let message = MockMessageAnimation::new()
+        .caption("caption")
+        .caption_entities(vec![MessageEntity::bold(0, 3)]);
+
+    let message_object = message.build();
+    assert_eq!(message_object.caption(), Some("caption"));
+    assert_eq!(
+        message_object.caption_entities(),
+        Some(vec![MessageEntity::bold(0, 3)]).as_deref()
+    );
+}
+
+#[test]
+fn test_message_common_audio() {
+    let message = MockMessageAudio::new()
+        .caption("caption")
+        .caption_entities(vec![MessageEntity::bold(0, 3)])
+        .media_group_id("123");
+
+    let message_object = message.build();
+    assert_eq!(message_object.caption(), Some("caption"));
+    assert_eq!(
+        message_object.caption_entities(),
+        Some(vec![MessageEntity::bold(0, 3)]).as_deref()
+    );
+    assert_eq!(message_object.media_group_id(), Some(&"123".into()));
+}
+
+#[test]
+fn test_message_common_contact() {
+    let message = MockMessageContact::new()
+        .last_name("last_name")
+        .vcard("vcard");
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.contact().unwrap().phone_number,
+        MockMessageContact::PHONE_NUMBER
+    );
+    assert_eq!(
+        message_object.contact().unwrap().first_name,
+        MockUser::FIRST_NAME
+    );
+    assert_eq!(
+        message_object.contact().unwrap().last_name,
+        Some("last_name".to_string())
+    );
+    assert_eq!(
+        message_object.contact().unwrap().vcard,
+        Some("vcard".to_string())
+    );
+}
+
+#[test]
+fn test_message_common_document() {
+    let message = MockMessageDocument::new()
+        .caption("caption")
+        .caption_entities(vec![MessageEntity::bold(0, 3)]);
+
+    let message_object = message.build();
+    assert_eq!(message_object.caption(), Some("caption"));
+    assert_eq!(
+        message_object.caption_entities(),
+        Some(vec![MessageEntity::bold(0, 3)]).as_deref()
+    );
+}
+
+#[test]
+fn test_message_common_game() {
+    let message = MockMessageGame::new();
+
+    let message_object = message.build();
+    assert_eq!(message_object.game().unwrap().title, MockMessageGame::TITLE);
+    assert_eq!(
+        message_object.game().unwrap().description,
+        MockMessageGame::DESCRIPTION
+    );
+}
+
+#[test]
+fn test_message_common_venue() {
+    let message = MockMessageVenue::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.venue().unwrap().title,
+        MockMessageVenue::TITLE
+    );
+    assert_eq!(
+        message_object.venue().unwrap().address,
+        MockMessageVenue::ADDRESS
+    );
+}
+
+#[test]
+fn test_message_common_location() {
+    let message = MockMessageLocation::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.location().unwrap().latitude,
+        MockMessageLocation::LATITUDE
+    );
+    assert_eq!(
+        message_object.location().unwrap().longitude,
+        MockMessageLocation::LONGITUDE
+    );
+}
+
+#[test]
+fn test_message_common_photo() {
+    let message = MockMessagePhoto::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.photo().unwrap()[0].width,
+        MockPhotoSize::WIDTH
+    );
+    assert_eq!(
+        message_object.photo().unwrap()[0].height,
+        MockPhotoSize::HEIGHT
+    );
+}
+
+#[test]
+fn test_message_common_poll() {
+    let message = MockMessagePoll::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.poll().unwrap().question,
+        MockMessagePoll::QUESTION
+    );
+    assert_eq!(
+        message_object.poll().unwrap().poll_type,
+        MockMessagePoll::POLL_TYPE
+    );
+}
+
+#[test]
+fn test_message_common_sticker() {
+    let message = MockMessageSticker::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.sticker().unwrap().file.id,
+        MockMessageSticker::FILE_ID.into()
+    );
+}
+
+#[test]
+fn test_message_common_video() {
+    let message = MockMessageVideo::new();
+
+    let message_object = message.build();
+    assert_eq!(message_object.video().unwrap().width, MockVideo::WIDTH);
+    assert_eq!(message_object.video().unwrap().height, MockVideo::HEIGHT);
+}
+
+#[test]
+fn test_message_common_video_note() {
+    let message = MockMessageVideoNote::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.video_note().unwrap().duration,
+        MockMessageVideoNote::DURATION
+    );
+    assert_eq!(
+        message_object.video_note().unwrap().length,
+        MockMessageVideoNote::LENGTH
+    );
+}
+
+#[test]
+fn test_message_common_voice() {
+    let message = MockMessageVoice::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.voice().unwrap().duration,
+        MockMessageVoice::DURATION
+    );
+}
+
+#[test]
+fn test_message_common_migration_to_chat() {
+    let message = MockMessageMigrationToChat::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.migrate_to_chat_id().unwrap(),
+        &ChatId(MockMessageMigrationToChat::MIGRATE_TO_CHAT_ID)
+    );
+}
+
+#[test]
+fn test_message_common_migration_from_chat() {
+    let message = MockMessageMigrationFromChat::new();
+
+    let message_object = message.build();
+    assert_eq!(
+        message_object.migrate_from_chat_id().unwrap(),
+        &ChatId(MockMessageMigrationFromChat::MIGRATE_FROM_CHAT_ID)
+    );
+}
+
+//
+//
+//
+
+#[test]
+fn test_callback_query() {
+    let query = MockCallbackQuery::new();
+    let query_object = query.build();
+    assert_eq!(query_object.id, MockCallbackQuery::ID.into());
+    assert_eq!(query_object.from.first_name, MockUser::FIRST_NAME);
+}
+
+//
+//
+//
+
+#[test]
+fn test_update_poll() {
+    let update = MockUpdatePoll::new().poll_id("123");
+
+    let update_object = update.into_update(&AtomicI32::new(1))[0].clone();
+
+    if let UpdateKind::Poll(poll) = update_object.kind {
+        assert_eq!(poll.question, MockMessagePoll::QUESTION);
+        assert_eq!(poll.poll_type, MockMessagePoll::POLL_TYPE);
+        assert_eq!(poll.id, "123".into());
+    } else {
+        unreachable!()
+    }
+}
+
+//
+// Ergonomic API tests
+//
+
+/// Test that mock builders can be passed directly without calling .build()
+/// using the From implementations
+#[test]
+fn test_from_impl_no_build_required() {
+    // User can be passed directly to .from() without .build()
+    let user_builder = MockUser::new().id(1001).first_name("TestUser");
+    let chat_builder = MockPrivateChat::new().id(1001);
+
+    // MockMessageText.from() accepts impl Into<User>, so we can pass MockUser directly
+    let message = MockMessageText::new()
+        .from(user_builder.clone()) // clone builder, auto-builds via From
+        .chat(chat_builder.clone()); // clone builder, auto-builds via From
+
+    let message_obj = message.build();
+    assert_eq!(message_obj.from.as_ref().unwrap().id, UserId(1001));
+    assert_eq!(message_obj.from.as_ref().unwrap().first_name, "TestUser");
+    assert_eq!(message_obj.chat.id, ChatId(1001));
+
+    // Also test with callback query - message field accepts impl Into<Message>
+    let callback_query = MockCallbackQuery::new()
+        .from(user_builder) // pass mock builder directly
+        .message(MockMessageText::new().text("Callback context").id(42)); // pass mock builder directly
+
+    let callback_obj = callback_query.build();
+    assert_eq!(callback_obj.from.id, UserId(1001));
+    assert_eq!(callback_obj.from.first_name, "TestUser");
+}
+
+/// Test that mock builders implement Clone for easy reuse
+#[test]
+fn test_mock_builders_are_cloneable() {
+    let user = MockUser::new().id(1001).first_name("SharedUser");
+    let chat = MockPrivateChat::new().id(1001);
+
+    // Clone and use in multiple places
+    let message1 = MockMessageText::new()
+        .from(user.clone())
+        .chat(chat.clone())
+        .text("First message");
+
+    let message2 = MockMessageText::new()
+        .from(user.clone())
+        .chat(chat.clone())
+        .text("Second message");
+
+    let callback = MockCallbackQuery::new().from(user.clone());
+
+    // All should have the same user ID
+    assert_eq!(message1.build().from.unwrap().id, UserId(1001));
+    assert_eq!(message2.build().from.unwrap().id, UserId(1001));
+    assert_eq!(callback.build().from.id, UserId(1001));
+}
+
+/// Test that ID fields accept teloxide types directly (UserId, ChatId, MessageId)
+#[test]
+fn test_id_fields_accept_teloxide_types() {
+    // Test UserId can be passed directly
+    let user_id = UserId(12345);
+    let user = MockUser::new().id(user_id);
+    assert_eq!(user.build().id, UserId(12345));
+
+    // Test ChatId can be passed directly
+    let chat_id = ChatId(-100123456789);
+    let chat = MockPrivateChat::new().id(chat_id);
+    assert_eq!(chat.build().id, ChatId(-100123456789));
+
+    // Test MessageId can be passed directly
+    let message_id = MessageId(42);
+    let message = MockMessageText::new().id(message_id);
+    assert_eq!(message.build().id, MessageId(42));
+}
+
+/// Test that From implementations work for all chat types
+#[test]
+fn test_from_impl_all_chat_types() {
+    // Private chat
+    let private: teloxide::types::Chat = MockPrivateChat::new().id(100).into();
+    assert_eq!(private.id, ChatId(100));
+
+    // Group chat
+    let group: teloxide::types::Chat = MockGroupChat::new().id(-200).title("Group").into();
+    assert_eq!(group.id, ChatId(-200));
+    assert_eq!(group.title(), Some("Group"));
+
+    // Channel chat
+    let channel: teloxide::types::Chat = MockChannelChat::new().id(-300).into();
+    assert_eq!(channel.id, ChatId(-300));
+
+    // Supergroup chat
+    let supergroup: teloxide::types::Chat = MockSupergroupChat::new().id(-400).into();
+    assert_eq!(supergroup.id, ChatId(-400));
+}
+
+/// Test that From implementations work for message types
+#[test]
+fn test_from_impl_message_types() {
+    // Text message
+    let text_msg: teloxide::types::Message = MockMessageText::new().text("hello").into();
+    assert_eq!(text_msg.text(), Some("hello"));
+
+    // Photo message
+    let photo_msg: teloxide::types::Message = MockMessagePhoto::new().into();
+    assert!(photo_msg.photo().is_some());
+
+    // Dice message
+    let dice_msg: teloxide::types::Message = MockMessageDice::new().value(6).into();
+    assert_eq!(dice_msg.dice().unwrap().value, 6);
+}
+
+/// Test that From implementation works for CallbackQuery
+#[test]
+fn test_from_impl_callback_query() {
+    let callback: teloxide::types::CallbackQuery =
+        MockCallbackQuery::new().data("callback_data").into();
+
+    assert_eq!(callback.data, Some("callback_data".to_string()));
+}

@@ -1,0 +1,33 @@
+# Build artifacts
+target/
+
+# Environment files
+.env
+.env.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Rust
+**/*.rs.bk
+Cargo.lock
+
+# Test databases
+*.db
+*.sqlite
+
+# Documentation build
+/doc/
+
+# Coverage
+*.profraw
+*.profdata
+coverage/

@@ -1,0 +1,139 @@
+use std::sync::Mutex;
+
+use actix_web::web;
+use serde::Deserialize;
+use serde_json::json;
+use teloxide::types::{
+    Me, MediaAnimation, MediaAudio, MediaDocument, MediaKind, MediaPhoto, MediaVideo, MediaVoice,
+    MessageEntity, MessageId, MessageKind, ParseMode, ReplyMarkup,
+};
+
+use super::{
+    common::{lock_state, RouteError, RouteResult},
+    make_telegram_result, BodyChatId,
+};
+use crate::{
+    server::{routes::check_if_message_exists, CopiedMessage},
+    state::State,
+};
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct CopyMessageBody {
+    pub chat_id: BodyChatId,
+    pub message_thread_id: Option<i64>,
+    pub from_chat_id: BodyChatId,
+    pub message_id: i32,
+    pub caption: Option<String>,
+    pub parse_mode: Option<ParseMode>,
+    pub caption_entities: Option<Vec<MessageEntity>>,
+    pub show_caption_above_media: Option<bool>,
+    pub disable_notification: Option<bool>,
+    pub protect_content: Option<bool>,
+    pub reply_markup: Option<ReplyMarkup>,
+}
+
+pub async fn copy_message(
+    body: web::Json<CopyMessageBody>,
+    me: web::Data<Me>,
+    state: web::Data<Mutex<State>>,
+) -> RouteResult {
+    let mut lock = lock_state(&state)?;
+    let chat = body.chat_id.chat();
+    check_if_message_exists!(lock, body.message_id, result);
+
+    let mut message = lock
+        .messages
+        .get_message(body.message_id)
+        .ok_or_else(|| RouteError::bad_request("Message not found"))?;
+    message.chat = chat;
+    message.from = Some(me.user.clone());
+
+    if let MessageKind::Common(ref mut common) = message.kind {
+        common.forward_origin = None;
+        common.external_reply = None;
+
+        // Handle show_caption_above_media for supported media types
+        let show_above = body.show_caption_above_media.unwrap_or(false);
+
+        match common.media_kind {
+            MediaKind::Animation(MediaAnimation {
+                ref mut caption,
+                ref mut caption_entities,
+                ref mut show_caption_above_media,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                *show_caption_above_media = show_above;
+            }
+            MediaKind::Audio(MediaAudio {
+                ref mut caption,
+                ref mut caption_entities,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                // Audio doesn't support show_caption_above_media
+            }
+            MediaKind::Document(MediaDocument {
+                ref mut caption,
+                ref mut caption_entities,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                // Document doesn't support show_caption_above_media
+            }
+            MediaKind::Photo(MediaPhoto {
+                ref mut caption,
+                ref mut caption_entities,
+                ref mut show_caption_above_media,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                *show_caption_above_media = show_above;
+            }
+            MediaKind::Video(MediaVideo {
+                ref mut caption,
+                ref mut caption_entities,
+                ref mut show_caption_above_media,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                *show_caption_above_media = show_above;
+            }
+            MediaKind::Voice(MediaVoice {
+                ref mut caption,
+                ref mut caption_entities,
+                ..
+            }) => {
+                *caption = body.caption.clone();
+                *caption_entities = body.caption_entities.clone().unwrap_or_default();
+                // Voice doesn't support show_caption_above_media
+            }
+            _ => {}
+        };
+
+        if let Some(ReplyMarkup::InlineKeyboard(markup)) = body.reply_markup.clone() {
+            common.reply_markup = Some(markup);
+        }
+        common.has_protected_content = body.protect_content.unwrap_or(false);
+    }
+
+    let last_id = lock.messages.max_message_id();
+    message.id = MessageId(last_id + 1);
+    message.chat = body.chat_id.chat();
+    let message = lock.messages.add_message(message);
+
+    lock.responses.sent_messages.push(message.clone());
+    lock.responses.copied_messages.push(CopiedMessage {
+        message_id: message.id,
+        bot_request: body.into_inner(),
+    });
+
+    Ok(make_telegram_result(json!({
+        "message_id": message.id.0
+    })))
+}
