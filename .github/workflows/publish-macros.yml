@@ -1,17 +1,16 @@
-name: Publish to crates.io
+name: Publish Macros to crates.io
 
 on:
   push:
     tags:
-      - 'v*'
-      - '!teremock_macros/*'
+      - 'teremock_macros/v*'
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   publish:
-    name: Publish
+    name: Publish Macros
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +23,8 @@ jobs:
 
       - name: Verify tag matches Cargo.toml version
         run: |
-          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
-          CARGO_VERSION=$(grep '^version' teremock/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          TAG_VERSION="${GITHUB_REF#refs/tags/teremock_macros/v}"
+          CARGO_VERSION=$(grep '^version' teremock_macros/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
 
           if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
             echo "Error: Tag version ($TAG_VERSION) doesn't match Cargo.toml version ($CARGO_VERSION)"
@@ -34,18 +33,18 @@ jobs:
 
           echo "Version verified: $TAG_VERSION"
 
-      - name: Publish teremock
-        run: cargo publish -p teremock --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      - name: Publish teremock_macros
+        run: cargo publish -p teremock_macros --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
       - name: Verify publish
         run: |
-          VERSION=$(grep '^version' teremock/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          echo "Waiting for teremock $VERSION to be indexed..."
+          VERSION=$(grep '^version' teremock_macros/Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Waiting for teremock_macros $VERSION to be indexed..."
 
           for i in {1..20}; do
             sleep 15
-            if curl -sf "https://crates.io/api/v1/crates/teremock/$VERSION" | grep -q '"version"'; then
-              echo "teremock $VERSION successfully published!"
+            if curl -sf "https://crates.io/api/v1/crates/teremock_macros/$VERSION" | grep -q '"version"'; then
+              echo "teremock_macros $VERSION successfully published!"
               exit 0
             fi
             echo "Waiting for crates.io indexing... (attempt $i/20)"
