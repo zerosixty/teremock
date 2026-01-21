@@ -165,6 +165,9 @@ jobs:
           git add teremock/Cargo.toml README.md
           git commit -m "chore: bump version to $NEW_VERSION"
 
+      - name: Pull latest changes
+        run: git pull --rebase origin master
+
       - name: Create and push tag
         run: |
           NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
