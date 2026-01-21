@@ -70,14 +70,14 @@ jobs:
         run: cargo fmt --all -- --check
 
   msrv:
-    name: MSRV (1.80)
+    name: MSRV (1.83)
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust 1.80
-        run: rustup install 1.80 --profile minimal
+      - name: Install Rust 1.83
+        run: rustup install 1.83 --profile minimal
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
@@ -85,4 +85,4 @@ jobs:
           cache-on-failure: true
 
       - name: Check MSRV
-        run: cargo +1.80 check --workspace
+        run: cargo +1.83 check --workspace
