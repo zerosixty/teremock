@@ -82,7 +82,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dev-dependencies]
-teremock = "0.1"
+teremock = "0.5"
 ```
 
 ## Quick Start
