@@ -17,8 +17,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  validate:
-    name: Validate
+  calculate-version:
+    name: Calculate Version
     runs-on: ubuntu-latest
     outputs:
       new_version: ${{ steps.new.outputs.version }}
@@ -57,32 +57,83 @@ jobs:
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "Bumping version: $CURRENT -> $NEW_VERSION"
 
+  fmt:
+    name: Check Formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
       - name: Cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
 
-      - name: Run tests
-        run: cargo test --workspace
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: MSRV check (1.83)
-        run: |
-          rustup install 1.83 --profile minimal
-          cargo +1.83 check --workspace
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
-      - name: Dry-run publish
-        run: cargo publish --dry-run -p teremock
+      - run: cargo test --workspace
+
+  msrv:
+    name: MSRV (1.83)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.83
+        run: rustup install 1.83 --profile minimal
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - run: cargo +1.83 check --workspace
+
+  dry-run:
+    name: Dry-run Publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - run: cargo publish --dry-run -p teremock
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: validate
+    needs:
+      - calculate-version
+      - fmt
+      - clippy
+      - test
+      - msrv
+      - dry-run
     permissions:
       contents: write
 
@@ -99,24 +150,24 @@ jobs:
 
       - name: Update version in Cargo.toml
         run: |
-          NEW_VERSION="${{ needs.validate.outputs.new_version }}"
+          NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" teremock/Cargo.toml
 
       - name: Update version in README
         run: |
-          NEW_VERSION="${{ needs.validate.outputs.new_version }}"
+          NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           MAJOR_MINOR=$(echo "$NEW_VERSION" | cut -d. -f1,2)
           sed -i "s/teremock = \"[0-9]*\.[0-9]*\"/teremock = \"$MAJOR_MINOR\"/" README.md
 
       - name: Commit version bump
         run: |
-          NEW_VERSION="${{ needs.validate.outputs.new_version }}"
+          NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           git add teremock/Cargo.toml README.md
           git commit -m "chore: bump version to $NEW_VERSION"
 
       - name: Create and push tag
         run: |
-          NEW_VERSION="${{ needs.validate.outputs.new_version }}"
+          NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           git tag "v$NEW_VERSION"
           git push origin master
           git push origin "v$NEW_VERSION"
@@ -124,7 +175,7 @@ jobs:
       - name: Generate release notes
         id: notes
         run: |
-          NEW_VERSION="${{ needs.validate.outputs.new_version }}"
+          NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           PREV_TAG=$(git tag -l 'v*' --sort=-version:refname | head -2 | tail -1 || echo "")
 
           if [ -n "$PREV_TAG" ]; then
@@ -146,8 +197,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ needs.validate.outputs.new_version }}
-          name: v${{ needs.validate.outputs.new_version }}
+          tag_name: v${{ needs.calculate-version.outputs.new_version }}
+          name: v${{ needs.calculate-version.outputs.new_version }}
           body: ${{ steps.notes.outputs.notes }}
           draft: false
           prerelease: false
