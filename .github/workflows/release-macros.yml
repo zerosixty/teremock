@@ -98,7 +98,7 @@ jobs:
         run: |
           NEW_VERSION="${{ needs.validate.outputs.new_version }}"
           git add teremock_macros/Cargo.toml
-          git commit -m "chore(macros): bump version to $NEW_VERSION"
+          git commit -m "Release teremock_macros $NEW_VERSION"
 
       - name: Create and push tag
         run: |

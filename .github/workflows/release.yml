@@ -140,7 +140,7 @@ jobs:
         run: |
           NEW_VERSION="${{ needs.calculate-version.outputs.new_version }}"
           git add teremock/Cargo.toml README.md
-          git commit -m "chore: bump version to $NEW_VERSION"
+          git commit -m "Release $NEW_VERSION"
 
       - name: Create and push tag
         run: |
