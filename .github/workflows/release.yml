@@ -96,10 +96,11 @@ jobs:
           cargo clippy --workspace --all-targets -- -D warnings
           cargo test --workspace
 
-      - name: Dry-run publish
+      - name: Dry-run publish (macros only)
         run: |
+          # Only dry-run teremock_macros since teremock depends on the new
+          # macros version which isn't published yet
           cargo publish --dry-run -p teremock_macros
-          cargo publish --dry-run -p teremock --allow-dirty
 
       - name: Commit version bump
         run: |
