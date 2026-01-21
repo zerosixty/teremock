@@ -89,7 +89,7 @@ jobs:
           cargo test --workspace
 
       - name: Dry-run publish
-        run: cargo publish --dry-run -p teremock
+        run: cargo publish --dry-run -p teremock --allow-dirty
 
       - name: Commit version bump
         run: |
