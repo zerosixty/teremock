@@ -37,7 +37,7 @@ cargo fmt -- --check # Check formatting without changes
 
 ## Code Style
 
-- MSRV: Rust 1.80
+- MSRV: Rust 1.83
 - Edition: 2021
 - Imports: Use `cargo fmt` (configured in rustfmt.toml)
 - Follow existing patterns in codebase for new mock endpoints

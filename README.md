@@ -3,8 +3,10 @@
 **Te**legram · **Re**alistic · **Mock**ing — A fast, ergonomic testing library for [teloxide](https://github.com/teloxide/teloxide) bots.
 
 [![Crates.io](https://img.shields.io/crates/v/teremock.svg)](https://crates.io/crates/teremock)
+[![Downloads](https://img.shields.io/crates/d/teremock.svg)](https://crates.io/crates/teremock)
 [![Documentation](https://docs.rs/teremock/badge.svg)](https://docs.rs/teremock)
 [![CI](https://github.com/zerosixty/teremock/actions/workflows/ci.yml/badge.svg)](https://github.com/zerosixty/teremock/actions/workflows/ci.yml)
+[![MSRV](https://img.shields.io/badge/MSRV-1.83-blue)](https://blog.rust-lang.org/2024/11/28/Rust-1.83.0.html)
 [![teloxide](https://img.shields.io/badge/teloxide-0.17-green)](https://github.com/teloxide/teloxide)
 [![License](https://img.shields.io/crates/l/teremock.svg)](LICENSE)
 
