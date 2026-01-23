@@ -49,6 +49,11 @@ cargo fmt -- --check # Check formatting without changes
 - Each Telegram API method gets its own route module
 - State management in `teremock/src/state.rs`
 
+## Versioning
+
+- **Never modify `version` in Cargo.toml** - versions are incremented automatically by GitHub Actions during release
+- **Never modify `teremock_macros` dependency version** - this is also managed by CI
+
 ## Before Committing
 
 1. `cargo fmt`
